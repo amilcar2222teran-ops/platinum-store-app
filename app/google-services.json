@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "243659263393",
+    "project_id": "platinum-d15ee",
+    "storage_bucket": "platinum-d15ee.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:243659263393:android:9e4a46de6439fa2c2e8fe0",
+        "android_client_info": {
+          "package_name": "com.ucompensar.platinum"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCoguXcDYJHLz7JCg0FHvfPoMHqd-aaOa4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

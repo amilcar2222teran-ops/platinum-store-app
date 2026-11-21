@@ -5,9 +5,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -17,111 +18,214 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ucompensar.platinum.data.model.OrderData
+import com.ucompensar.platinum.data.service.FirestoreService
 import com.ucompensar.platinum.ui.theme.CloudWhite
 import com.ucompensar.platinum.ui.theme.PlatinumTheme
 import com.ucompensar.platinum.ui.theme.Purple
+import com.ucompensar.platinum.ui.theme.Teal
+import kotlinx.coroutines.launch
 
 @Composable
 fun SellHistoryScreen(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLogoutClick: () -> Unit = {}
 ) {
+    var orders by remember { mutableStateOf<List<OrderData>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        coroutineScope.launch {
+            val result = FirestoreService.getOrders()
+            isLoading = false
+            result.onSuccess { list ->
+                orders = list
+            }
+        }
+    }
+
+    val barColors = listOf(
+        Color(0xFF4A89F3), // Azul
+        Color(0xFFA58CF5), // Morado claro
+        Color(0xFFF6B26B), // Naranja / Dorado
+        Color(0xFFFCDD53)  // Amarillo
+    )
+
+    val topBarData = remember(orders) {
+        val aggregated = orders.flatMap { it.items }
+            .groupBy { it.nombre.ifBlank { "Producto" } }
+            .mapValues { entry -> entry.value.sumOf { it.cantidad } }
+            .entries
+            .sortedByDescending { it.value }
+            .take(4)
+
+        if (aggregated.isEmpty()) {
+            listOf(
+                BarData(label = "1", value = 60f, color = barColors[0]),
+                BarData(label = "2", value = 45f, color = barColors[1]),
+                BarData(label = "3", value = 78f, color = barColors[2]),
+                BarData(label = "4", value = 30f, color = barColors[3])
+            )
+        } else {
+            aggregated.mapIndexed { index, entry ->
+                BarData(
+                    label = "${index + 1}",
+                    value = entry.value.toFloat(),
+                    color = barColors[index % barColors.size]
+                )
+            }
+        }
+    }
+
+    val recentSalesList = remember(orders) {
+        val sortedOrders = orders.sortedByDescending { it.fecha }
+        val items = sortedOrders.flatMap { order -> order.items }.take(5)
+
+        if (items.isEmpty()) {
+            listOf(
+                "1.........................",
+                "2.........................",
+                "3.........................",
+                "4.........................",
+                "5........................."
+            )
+        } else {
+            val result = items.mapIndexed { index, item ->
+                "${index + 1}. ${item.nombre} (\$" + "${item.precio.toInt()})"
+            }.toMutableList()
+
+            while (result.size < 5) {
+                result.add("${result.size + 1}.........................")
+            }
+            result
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Purple)
             .padding(24.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Título: Top Ventas Mes
-            Text(
-                text = "Top Ventas Mes",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = CloudWhite,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Gráfica de Barras
-            SalesBarChart(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(260.dp)
-            )
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            // Título: Ultimas Ventas
-            Text(
-                text = "Ultimas Ventas",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = CloudWhite,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Lista de Últimas Ventas
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                val items = listOf(
-                    "1.........................",
-                    "2.........................",
-                    "3.........................",
-                    "4.........................",
-                    "5........................."
-                )
-                items.forEach { item ->
+                CircularProgressIndicator(color = Teal)
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    IconButton(onClick = onLogoutClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = "Cerrar sesión",
+                            tint = CloudWhite,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = item,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
+                        text = "Cerrar Sesión",
+                        style = MaterialTheme.typography.bodyMedium,
                         color = CloudWhite,
-                        textAlign = TextAlign.Center
+                        fontWeight = FontWeight.Medium
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Título: Top Ventas Mes
+                Text(
+                    text = "Top Ventas Mes",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = CloudWhite,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Gráfica de Barras
+                SalesBarChart(
+                    barData = topBarData,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp)
+                )
+
+                Spacer(modifier = Modifier.height(40.dp))
+
+                // Título: Ultimas Ventas
+                Text(
+                    text = "Ultimas Ventas",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = CloudWhite,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Lista de Últimas Ventas
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    recentSalesList.forEach { item ->
+                        Text(
+                            text = item,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = CloudWhite,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
         }
     }
 }
 
 @Composable
 private fun SalesBarChart(
+    barData: List<BarData>,
     modifier: Modifier = Modifier
 ) {
-    val barData = listOf(
-        BarData(label = "1", value = 60f, color = Color(0xFF4A89F3)),
-        BarData(label = "2", value = 45f, color = Color(0xFFA58CF5)),
-        BarData(label = "3", value = 78f, color = Color(0xFFF6B26B)),
-        BarData(label = "4", value = 30f, color = Color(0xFFFCDD53))
+    val maxVal = maxOf(80f, barData.maxOfOrNull { it.value } ?: 80f)
+    val yAxisLabels = listOf(
+        maxVal.toInt().toString(),
+        (maxVal * 0.75f).toInt().toString(),
+        (maxVal * 0.5f).toInt().toString(),
+        (maxVal * 0.25f).toInt().toString(),
+        "0"
     )
-
-    val yAxisLabels = listOf("80", "60", "40", "20", "0")
-    val maxValue = 80f
 
     Row(
         modifier = modifier
     ) {
-        // Eje Y (Etiquetas 80, 60, 40, 20, 0)
+        // Eje Y
         Column(
             modifier = Modifier
                 .fillMaxHeight()
@@ -138,19 +242,17 @@ private fun SalesBarChart(
             }
         }
 
-        // Área del gráfico con líneas de fondo y barras
+        // Área del gráfico
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
         ) {
-            // Contenedor de barras y líneas guía
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                // Líneas horizontales de fondo
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.SpaceBetween
@@ -165,14 +267,13 @@ private fun SalesBarChart(
                     }
                 }
 
-                // Barras
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.Bottom
                 ) {
                     barData.forEach { data ->
-                        val barHeightFraction = (data.value / maxValue).coerceIn(0f, 1f)
+                        val barHeightFraction = (data.value / maxVal).coerceIn(0.05f, 1f)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -187,7 +288,6 @@ private fun SalesBarChart(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Eje X (Etiquetas 1, 2, 3, 4)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
